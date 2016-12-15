@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
+	"html/template"
 	"os"
 	"path/filepath"
 )
@@ -32,23 +32,57 @@ func main() {
 		fmt.Println("将在当前目录创建项目")
 	}
 
-	tree := &FileTree{
-		Dir: "conf",
-		Files: []FileTemplate{
-			{Name: "config_default.json",
-				Template: "{}",
+	// tree := &FileTree{
+	// 	Dir: "conf",
+	// 	Files: []FileTemplate{
+	// 		{Name: "config_default.json",
+	// 			Template: "{}",
+	// 		},
+	// 	},
+	// }
+	// err := PlantTree(*project_name, *project_path, tree)
+	// if err != nil {
+	// 	printlnf("[ *** ] error: %s", err)
+	// 	return
+	// }
+
+	trees := []*FileTree{
+		&FileTree{
+			Dir: "conf",
+			Files: []FileTemplate{
+				{Name: "config_default.json",
+					Template: "{}",
+				},
+			},
+		},
+		&FileTree{
+			Dir: "controller",
+			Files: []FileTemplate{
+				{Name: "controller_default.go",
+					Template: controller_default_go,
+				},
 			},
 		},
 	}
-	err := PlantTree(*project_name, *project_path, tree)
+	err := PlantTrees(*project_name, *project_path, trees)
 	if err != nil {
 		printlnf("[ *** ] error: %s", err)
 		return
 	}
 }
 
-func printlnf(format string, paras ...interface{}) (int, error) {
-	return fmt.Println(fmt.Sprintf(format, paras...))
+func PlantTrees(project_name, project_path string, trees []*FileTree) error {
+	if trees == nil || len(trees) <= 0 {
+		return nil
+	}
+
+	for _, tree := range trees {
+		err := PlantTree(project_name, project_path, tree)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func PlantTree(project_name, project_path string, tree *FileTree) error {
@@ -71,19 +105,27 @@ func PlantTree(project_name, project_path string, tree *FileTree) error {
 		return nil
 	}
 
-	// touchFile := func( paras ...interface{}) string {
-
-	// }
 	for _, file := range tree.Files {
 		new_file_path := filepath.Join(path, file.Name)
-		fmt.Printf("create file: %s", new_file_path)
-
+		printlnf("create file: %s", new_file_path)
 		f, err := os.Create(new_file_path)
-		content := fmt.Sprintf(file.Template, project_name)
-		_, err = io.WriteString(f, content)
 		if err != nil {
 			return err
 		}
+
+		defer f.Close()
+
+		t, err := template.New(file.Name).Parse(file.Template)
+		err = t.Execute(f, project_name)
+		if err != nil {
+			return err
+		}
+		// content := fmt.Sprintf(file.Template, project_name)
+		// printlnf("file [%s] content: %s", new_file_path, content)
+		// _, err = io.WriteString(f, content)
+		// if err != nil {
+		// 	return err
+		// }
 	}
 
 	return nil
@@ -98,3 +140,24 @@ type FileTemplate struct {
 	Name     string
 	Template string
 }
+
+func printlnf(format string, paras ...interface{}) (int, error) {
+	return fmt.Println(fmt.Sprintf(format, paras...))
+}
+
+var (
+	controller_default_go = `
+	
+	package controller
+
+	import (
+		"github.com/gin-gonic/gin"
+		"net/http"
+	)
+	
+	func Hello(c *gin.Context) {
+		c.JSON(http.StatusOK, nil)
+	}
+
+	`
+)
