@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -11,6 +13,56 @@ import (
 var (
 	project_name = flag.String("name", "", "项目名称")
 	project_path = flag.String("path", "./", "项目路径")
+
+	trees = FileTreeArray{
+		&FileTree{
+			Dir: "conf",
+			Files: []FileTemplate{
+				{Name: "config_default.json",
+					Template: "{}",
+				},
+			},
+		},
+		&FileTree{
+			Dir: "controller",
+			Files: []FileTemplate{
+				{Name: "controller_default.go",
+					Template: controller_default_go,
+				},
+			},
+		},
+		&FileTree{
+			Dir:   "static",
+			Files: []FileTemplate{},
+		},
+		&FileTree{
+			Dir: "test",
+			Files: []FileTemplate{
+				{Name: "default_test.go",
+					Template: default_test_go,
+				},
+			},
+		},
+		&FileTree{
+			Dir:   "views",
+			Files: []FileTemplate{},
+		},
+		&FileTree{
+			Dir: "",
+			Files: []FileTemplate{
+				{Name: "main.go"},
+				{Name: "build_release.py"},
+			},
+		},
+		&FileTree{
+			Dir: "release",
+			Files: []FileTemplate{
+				{Name: "log_split.sh"},
+				{Name: "start.sh"},
+				{Name: "upgrade.sh"},
+			},
+		},
+	}
 )
 
 func main() {
@@ -32,38 +84,6 @@ func main() {
 		fmt.Println("将在当前目录创建项目")
 	}
 
-	// tree := &FileTree{
-	// 	Dir: "conf",
-	// 	Files: []FileTemplate{
-	// 		{Name: "config_default.json",
-	// 			Template: "{}",
-	// 		},
-	// 	},
-	// }
-	// err := PlantTree(*project_name, *project_path, tree)
-	// if err != nil {
-	// 	printlnf("[ *** ] error: %s", err)
-	// 	return
-	// }
-
-	trees := []*FileTree{
-		&FileTree{
-			Dir: "conf",
-			Files: []FileTemplate{
-				{Name: "config_default.json",
-					Template: "{}",
-				},
-			},
-		},
-		&FileTree{
-			Dir: "controller",
-			Files: []FileTemplate{
-				{Name: "controller_default.go",
-					Template: controller_default_go,
-				},
-			},
-		},
-	}
 	err := PlantTrees(*project_name, *project_path, trees)
 	if err != nil {
 		printlnf("[ *** ] error: %s", err)
@@ -71,7 +91,7 @@ func main() {
 	}
 }
 
-func PlantTrees(project_name, project_path string, trees []*FileTree) error {
+func PlantTrees(project_name, project_path string, trees FileTreeArray) error {
 	if trees == nil || len(trees) <= 0 {
 		return nil
 	}
@@ -115,17 +135,22 @@ func PlantTree(project_name, project_path string, tree *FileTree) error {
 
 		defer f.Close()
 
-		t, err := template.New(file.Name).Parse(file.Template)
+		var tmp string
+
+		bs, err := LoadFile(file.Name) //优先使用外部模板,方便更新
+		if err == nil {
+			tmp = string(bs)
+		} else if err == err_file_not_found { //外部模板不存在,使用内部定义模板
+			tmp = file.Template
+		} else {
+			return err
+		}
+
+		t, err := template.New(file.Name).Parse(string(tmp))
 		err = t.Execute(f, project_name)
 		if err != nil {
 			return err
 		}
-		// content := fmt.Sprintf(file.Template, project_name)
-		// printlnf("file [%s] content: %s", new_file_path, content)
-		// _, err = io.WriteString(f, content)
-		// if err != nil {
-		// 	return err
-		// }
 	}
 
 	return nil
@@ -136,6 +161,8 @@ type FileTree struct {
 	Files []FileTemplate
 }
 
+type FileTreeArray []*FileTree
+
 type FileTemplate struct {
 	Name     string
 	Template string
@@ -145,9 +172,30 @@ func printlnf(format string, paras ...interface{}) (int, error) {
 	return fmt.Println(fmt.Sprintf(format, paras...))
 }
 
+var err_file_not_found = errors.New("file_not_found")
+
+func LoadFile(name string) ([]byte, error) {
+	path := filepath.Join("./files", name)
+	if IsFileExist(path) == false {
+		return nil, err_file_not_found
+	}
+	return ioutil.ReadFile(path)
+}
+
+// exists returns whether the given file or directory exists or not
+func IsFileExist(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 var (
 	controller_default_go = `
-	
 	package controller
 
 	import (
@@ -159,5 +207,21 @@ var (
 		c.JSON(http.StatusOK, nil)
 	}
 
+	`
+	default_test_go = `
+	package tests
+
+	import (
+		"testing"
+	
+		. "github.com/smartystreets/goconvey/convey"
+	)
+	
+	func TestDefault(t *testing.T) {
+		Convey("TestDefault ", t, func() {
+			So(0, ShouldNotEqual, 0)
+		})
+	}
+		
 	`
 )
