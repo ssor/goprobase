@@ -36,6 +36,10 @@ var (
 			Files: []FileTemplate{},
 		},
 		&FileTree{
+			Dir:   "static/javascripts",
+			Files: []FileTemplate{},
+		},
+		&FileTree{
 			Dir: "test",
 			Files: []FileTemplate{
 				{Name: "default_test.go",
@@ -107,11 +111,10 @@ func PlantTrees(project_name, project_path string, trees FileTreeArray) error {
 
 func PlantTree(project_name, project_path string, tree *FileTree) error {
 	base_path := filepath.Join(project_path, project_name)
-	printlnf("project base dir: %s", base_path)
+	// printlnf("project base dir: %s", base_path)
 
 	if len(tree.Dir) <= 0 {
 		printlnf("no dir created")
-		return nil
 	}
 
 	path := filepath.Join(base_path, tree.Dir)
