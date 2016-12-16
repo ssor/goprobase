@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -85,9 +86,9 @@ func main() {
 		*project_path = "./"
 	}
 	if *project_path == "./" {
-		fmt.Println("将在当前目录创建项目")
+		fmt.Println("将在当前目录创建项目,目录结构如下:")
 	}
-
+	trees.Print()
 	err := PlantTrees(*project_name, *project_path, trees)
 	if err != nil {
 		printlnf("[ *** ] error: %s", err)
@@ -114,11 +115,11 @@ func PlantTree(project_name, project_path string, tree *FileTree) error {
 	// printlnf("project base dir: %s", base_path)
 
 	if len(tree.Dir) <= 0 {
-		printlnf("no dir created")
+		// printlnf("no dir created")
 	}
 
 	path := filepath.Join(base_path, tree.Dir)
-	printlnf("create project: %s", path)
+	// printlnf("create project: %s", path)
 	err := os.MkdirAll(path, os.ModePerm)
 	if err != nil {
 		return err
@@ -130,7 +131,7 @@ func PlantTree(project_name, project_path string, tree *FileTree) error {
 
 	for _, file := range tree.Files {
 		new_file_path := filepath.Join(path, file.Name)
-		printlnf("create file: %s", new_file_path)
+		// printlnf("create file: %s", new_file_path)
 		f, err := os.Create(new_file_path)
 		if err != nil {
 			return err
@@ -165,6 +166,26 @@ type FileTree struct {
 }
 
 type FileTreeArray []*FileTree
+
+func (fta FileTreeArray) Print() {
+	for _, tree := range fta {
+		// printlnf("")
+		var pre_space = ""
+		if len(tree.Dir) > 0 {
+			printlnf("|%s %s", strings.Repeat("-", 4), tree.Dir)
+			pre_space = fmt.Sprintf("|%s|", strings.Repeat(" ", 5))
+		} else {
+			pre_space = fmt.Sprintf("|%s", strings.Repeat("-", 0))
+		}
+		if tree.Files == nil || len(tree.Files) <= 0 {
+			continue
+		}
+		// printlnf("%s|", strings.Repeat(" ", 4))
+		for _, tmp := range tree.Files {
+			printlnf("%s%s %s", pre_space, strings.Repeat("-", 4), tmp.Name)
+		}
+	}
+}
 
 type FileTemplate struct {
 	Name     string
